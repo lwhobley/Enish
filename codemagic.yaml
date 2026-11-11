@@ -1,7 +1,8 @@
 # Codemagic: builds the Enish iOS app and uploads it to TestFlight.
 #
 # One-time setup in Codemagic (Team settings > Integrations > Developer Portal):
-#   add an App Store Connect API key named exactly "Enish App Store Connect".
+#   uses the existing team API key "Venue Wrangler Wine" (key DLFKRVDZ4G),
+#   which covers every app on Apple team 8MTB6AL22R.
 # Signing certificates and provisioning profiles are created and fetched
 # automatically from that key (ios_signing below).
 
@@ -11,7 +12,7 @@ workflows:
     max_build_duration: 60
     instance_type: mac_mini_m2
     integrations:
-      app_store_connect: Enish App Store Connect
+      app_store_connect: Venue Wrangler Wine
     environment:
       flutter: stable
       xcode: latest
