@@ -1,0 +1,33 @@
+// One-off (already run, now deployed as a 410 stub): copied the Enish website's
+// homepage film into the app's own storage as the intro video. Fixed source,
+// accepts no input.
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
+
+const SOURCE = "https://cdn.shopify.com/videos/c/o/v/c5b64bff98294969a5d53d4a17eb3048.mp4";
+const PATH = "intro/enish-welcome.mp4";
+
+Deno.serve(async () => {
+  try {
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+    const res = await fetch(SOURCE);
+    if (!res.ok) throw new Error(`fetch ${res.status}`);
+    const body = new Uint8Array(await res.arrayBuffer());
+    const up = await supabase.storage.from("media")
+      .upload(PATH, body, { contentType: "video/mp4", upsert: true });
+    if (up.error) throw up.error;
+    const publicUrl = supabase.storage.from("media").getPublicUrl(PATH).data.publicUrl;
+    const row = await supabase.from("media").upsert({
+      kind: "video", category: "intro", venue_code: null, title: "Welcome to Enish",
+      storage_path: PATH, public_url: publicUrl,
+      source: "website", source_ref: "home:hero-video", sort_order: 0,
+    }, { onConflict: "storage_path" });
+    if (row.error) throw row.error;
+    return Response.json({ ok: PATH, bytes: body.length, publicUrl });
+  } catch (e) {
+    return Response.json({ error: String((e as Error)?.message ?? e) }, { status: 500 });
+  }
+});
