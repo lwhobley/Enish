@@ -22,7 +22,7 @@ workflows:
       vars:
         BUNDLE_ID: com.enishglobal.enish
         # The app's Apple ID from App Store Connect > App Information.
-        APP_STORE_APPLE_ID: "0000000000"
+        APP_STORE_APPLE_ID: "6833665320"
     triggering:
       events:
         - push
