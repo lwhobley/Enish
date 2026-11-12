@@ -8,6 +8,8 @@ import '../brand/brand.dart';
 import '../brand/visuals.dart';
 import '../data/locations.dart';
 import '../data/media.dart';
+import '../data/events.dart';
+import 'event_card.dart';
 import 'venues.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -27,6 +29,10 @@ class HomeScreen extends ConsumerWidget {
           final open = all.where((v) => v.isOpen).toList();
           final home = open.where((v) => v.code == homeCode).firstOrNull;
           final events = media.events;
+          final listed = (ref.watch(upcomingEventsProvider).value ??
+                  const <EnishEvent>[])
+              .take(12)
+              .toList();
           final films = media.films;
           final food = media.food;
           final experiences = media.experiences;
@@ -86,13 +92,22 @@ class HomeScreen extends ConsumerWidget {
                 title: "What's on",
                 height: 240,
                 itemWidth: 180,
-                itemCount: events.length.clamp(0, 12),
-                itemBuilder: (context, i) => PhotoCard(
-                  onTap: () => showPhoto(context, events[i]),
-                  child: EnishPhoto(url: events[i].url, alignment: Alignment.topCenter),
-                ),
+                itemCount: listed.length + events.length.clamp(0, 12),
+                itemBuilder: (context, i) => i < listed.length
+                    ? EventCard(
+                        event: listed[i],
+                        venue: all
+                            .where((v) => v.code == listed[i].venueCode)
+                            .firstOrNull,
+                      )
+                    : PhotoCard(
+                        onTap: () => showPhoto(context, events[i - listed.length]),
+                        child: EnishPhoto(
+                            url: events[i - listed.length].url,
+                            alignment: Alignment.topCenter),
+                      ),
               ),
-              if (events.isNotEmpty)
+              if (events.isNotEmpty || listed.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(
                       EnishSpace.md, EnishSpace.sm, EnishSpace.md, 0),

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../brand/brand.dart';
 import '../brand/visuals.dart';
 import '../data/locations.dart';
+import '../data/events.dart';
 import '../data/media.dart';
+import 'event_card.dart';
 
 /// Every event across the group, as a wall of posters filterable by venue.
 class WhatsOnScreen extends ConsumerStatefulWidget {
@@ -23,9 +26,17 @@ class _WhatsOnScreenState extends ConsumerState<WhatsOnScreen> {
     final venues = ref.watch(venuesProvider).value ?? const <Venue>[];
     final byCode = {for (final v in venues) v.code: v};
 
+    final listedAsync = ref.watch(upcomingEventsProvider);
+    final listed = listedAsync.value ?? const <EnishEvent>[];
+    final loading = listedAsync.isLoading || ref.watch(mediaProvider).isLoading;
     final all = media.events;
-    final codes = {for (final e in all) ?e.venueCode}.toList()..sort();
+    final codes = {
+      for (final e in all) ?e.venueCode,
+      for (final e in listed) ?e.venueCode,
+    }.toList()
+      ..sort();
     final shown = _venue == null ? all : all.where((e) => e.venueCode == _venue).toList();
+    final shownListed = _venue == null ? listed : listed.at(_venue!);
 
     return Scaffold(
       appBar: AppBar(title: const Text("WHAT'S ON")),
@@ -55,11 +66,38 @@ class _WhatsOnScreenState extends ConsumerState<WhatsOnScreen> {
             ),
           ),
         ),
-        if (shown.isEmpty)
+        if (shownListed.isNotEmpty) ...[
           const SliverToBoxAdapter(
+            child: EnishSectionHeader(eyebrow: 'Dates for the diary', title: 'Coming up'),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: EnishSpace.md),
+            sliver: SliverGrid.builder(
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 240,
+                childAspectRatio: 0.72,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+              ),
+              itemCount: shownListed.length,
+              itemBuilder: (context, i) => EventCard(
+                event: shownListed[i],
+                venue: byCode[shownListed[i].venueCode],
+              ),
+            ),
+          ),
+          if (shown.isNotEmpty)
+            const SliverToBoxAdapter(
+              child: EnishSectionHeader(eyebrow: 'Posters', title: 'From the venues'),
+            ),
+        ],
+        if (shown.isEmpty && shownListed.isEmpty)
+          SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.only(top: EnishSpace.md),
-              child: EnishComingSoon(message: 'No events listed yet.'),
+              padding: const EdgeInsets.only(top: EnishSpace.md),
+              child: loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : const EnishComingSoon(message: 'No events listed yet.'),
             ),
           )
         else
@@ -259,21 +297,57 @@ class InsiderScreen extends ConsumerWidget {
   }
 }
 
-class AccountScreen extends StatelessWidget {
+class AccountScreen extends ConsumerWidget {
   const AccountScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(sessionProvider).value;
+    final access = ref.watch(staffAccessProvider).value ?? StaffAccess.none;
+
     return Scaffold(
       appBar: AppBar(title: const Text('ACCOUNT')),
       body: ListView(
-        children: const [
-          EnishSectionHeader(title: 'Your account'),
-          EnishComingSoon(
+        children: [
+          const EnishSectionHeader(title: 'Your account'),
+          const EnishComingSoon(
             message: 'Sign-in, your bookings, notification settings and '
                 'membership management appear here once accounts are '
                 'connected.',
           ),
+          const EnishSectionHeader(eyebrow: 'For venue teams', title: 'Staff'),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: EnishSpace.md),
+            child: session == null
+                ? EnishButton(
+                    label: 'Staff sign in',
+                    primary: false,
+                    icon: Icons.lock_outline,
+                    onPressed: () => context.go('/account/sign-in'),
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text('Signed in as ${session.user.email ?? ''}',
+                          style: EnishText.body),
+                      const SizedBox(height: EnishSpace.md),
+                      if (access.isStaff) ...[
+                        EnishButton(
+                          label: 'Manage events',
+                          icon: Icons.event_note_outlined,
+                          onPressed: () => context.go('/account/staff'),
+                        ),
+                        const SizedBox(height: EnishSpace.sm),
+                      ],
+                      EnishButton(
+                        label: 'Sign out',
+                        primary: false,
+                        onPressed: StaffApi.signOut,
+                      ),
+                    ],
+                  ),
+          ),
+          const SizedBox(height: EnishSpace.xl),
         ],
       ),
     );

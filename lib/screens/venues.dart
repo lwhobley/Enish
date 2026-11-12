@@ -6,7 +6,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../brand/brand.dart';
 import '../brand/visuals.dart';
 import '../data/locations.dart';
+import '../data/events.dart';
 import '../data/media.dart';
+import 'event_card.dart';
 
 Future<void> _open(BuildContext context, Uri uri) async {
   final messenger = ScaffoldMessenger.of(context);
@@ -184,6 +186,8 @@ class VenueScreen extends ConsumerWidget {
 
     final films = media.filmsAt(code);
     final events = media.eventsAt(code);
+    final listed =
+        (ref.watch(upcomingEventsProvider).value ?? const <EnishEvent>[]).at(code);
     final ownFood = media.foodAt(code);
     final food = ownFood.isNotEmpty ? ownFood : media.food.take(12).toList();
 
@@ -306,11 +310,16 @@ class VenueScreen extends ConsumerWidget {
               title: "What's on",
               height: 240,
               itemWidth: 180,
-              itemCount: events.length,
-              itemBuilder: (context, i) => PhotoCard(
-                onTap: () => showPhoto(context, events[i]),
-                child: EnishPhoto(url: events[i].url, alignment: Alignment.topCenter),
-              ),
+              // Listed events first (soonest first), then the venue's posters.
+              itemCount: listed.length + events.length,
+              itemBuilder: (context, i) => i < listed.length
+                  ? EventCard(event: listed[i], venue: venue)
+                  : PhotoCard(
+                      onTap: () => showPhoto(context, events[i - listed.length]),
+                      child: EnishPhoto(
+                          url: events[i - listed.length].url,
+                          alignment: Alignment.topCenter),
+                    ),
             ),
           ),
           SliverToBoxAdapter(

@@ -8,7 +8,9 @@ import 'brand/brand.dart';
 import 'config.dart';
 import 'screens/home.dart';
 import 'screens/intro.dart';
+import 'data/events.dart';
 import 'screens/member.dart';
+import 'screens/staff.dart';
 import 'screens/venues.dart';
 
 Future<void> main() async {
@@ -56,7 +58,37 @@ final _router = GoRouter(
           GoRoute(path: '/insider', builder: (_, _) => const InsiderScreen()),
         ]),
         StatefulShellBranch(routes: [
-          GoRoute(path: '/account', builder: (_, _) => const AccountScreen()),
+          GoRoute(
+            path: '/account',
+            builder: (_, _) => const AccountScreen(),
+            routes: [
+              GoRoute(path: 'sign-in', builder: (_, _) => const StaffSignInScreen()),
+              GoRoute(
+                path: 'staff',
+                builder: (_, _) => const StaffHomeScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'new',
+                    builder: (_, s) {
+                      final v = s.uri.queryParameters['venue'];
+                      return EventEditorScreen(
+                          venueCode: (v == null || v.isEmpty) ? null : v);
+                    },
+                  ),
+                  GoRoute(
+                    path: 'edit',
+                    // The event travels in `extra`; after a web refresh it is
+                    // gone, so fall back to the list.
+                    redirect: (_, s) =>
+                        s.extra is EnishEvent ? null : '/account/staff',
+                    builder: (_, s) =>
+                        EventEditorScreen(event: s.extra! as EnishEvent),
+                  ),
+                  GoRoute(path: 'team', builder: (_, _) => const TeamScreen()),
+                ],
+              ),
+            ],
+          ),
         ]),
       ],
     ),

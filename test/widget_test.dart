@@ -1,6 +1,8 @@
+import 'package:enish/data/events.dart';
 import 'package:enish/data/locations.dart';
 import 'package:enish/data/media.dart';
 import 'package:enish/main.dart';
+import 'package:enish/screens/staff.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -99,6 +101,8 @@ void main() {
       overrides: [
         venuesProvider.overrideWith((ref) async => venues),
         mediaProvider.overrideWith((ref) async => MediaLibrary.empty),
+        upcomingEventsProvider.overrideWith((ref) async => const []),
+        sessionProvider.overrideWith((ref) => Stream.value(null)),
       ],
       child: const EnishApp(),
     ));
@@ -114,5 +118,74 @@ void main() {
     await tester.tap(find.text('ENISH CAMDEN'));
     await tester.pumpAndSettle();
     expect(find.text('BOOK A TABLE'), findsOneWidget);
+  });
+
+  test('events keep the venue wall-clock time both ways', () {
+    final e = EnishEvent.fromJson({
+      'id': 'x',
+      'venue_code': 'houston',
+      'title': 'Afrobeats Friday',
+      'starts_local': '2026-12-05T21:00:00',
+      'ends_local': '2026-12-06T02:00:00',
+      'starts_at': '2026-12-06T03:00:00+00:00',
+      'price_pence': 2550,
+      'status': 'published',
+    });
+    expect(e.startsLocal, DateTime(2026, 12, 5, 21));
+    expect(formatEventWhen(e), 'SAT 5 DEC · 9PM – 2AM');
+    expect(formatPrice(e.priceMinor!, currencySymbol('houston', 'USA')), r'$25.50');
+    final row = e.toRow();
+    expect(row['starts_local'], '2026-12-05T21:00:00');
+    expect(row.containsKey('starts_at'), isFalse);
+    expect(row['status'], 'published');
+  });
+
+  test('prices parse from what staff type', () {
+    expect(parsePrice(''), isNull);
+    expect(parsePrice('25'), 2500);
+    expect(parsePrice('£12.5'), 1250);
+    expect(parsePrice('0'), 0);
+    expect(formatPrice(0, '£'), 'FREE');
+    expect(currencySymbol('dubai', 'UAE'), 'AED ');
+  });
+
+  test('staff access follows roles', () {
+    final mgr = StaffAccess.fromRoles([
+      {'role': 'venue_manager', 'venue_code': 'camden'},
+    ]);
+    expect(mgr.canEdit('camden'), isTrue);
+    expect(mgr.canEdit('soho'), isFalse);
+    expect(mgr.canEdit(null), isFalse);
+    final admin = StaffAccess.fromRoles([
+      {'role': 'group_admin', 'venue_code': null},
+    ]);
+    expect(admin.canEdit('soho'), isTrue);
+    expect(admin.canEdit(null), isTrue);
+    expect(StaffAccess.none.isStaff, isFalse);
+  });
+
+  testWidgets('event editor needs a name and a date before publishing',
+      (tester) async {
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        venuesProvider.overrideWith((ref) async => [_venue('camden', 'Enish Camden')]),
+        staffAccessProvider.overrideWith((ref) async => StaffAccess.fromRoles([
+              {'role': 'venue_manager', 'venue_code': 'camden'},
+            ])),
+      ],
+      child: const MaterialApp(home: EventEditorScreen(venueCode: 'camden')),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('PUBLISH'));
+    await tester.pumpAndSettle();
+    expect(find.text('Give the event a name'), findsOneWidget);
+
+    await tester.enterText(find.widgetWithText(TextFormField, 'Event name'), 'Brunch Party');
+    await tester.tap(find.text('PUBLISH'));
+    await tester.pump();
+    expect(find.text('Choose a date and start time.'), findsOneWidget);
   });
 }
