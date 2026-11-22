@@ -145,21 +145,28 @@ int? parsePrice(String text) {
 // Guests
 // ---------------------------------------------------------------------------
 
-/// Published events from a few hours ago onwards, soonest first. Row-level
-/// security already hides drafts and members-only events from guests.
+/// Published public events from a few hours ago onwards, soonest first.
+/// Row-level security hides drafts and members-only events from guests, but
+/// signed-in staff can read their venues' members-only events, so the guest
+/// list filters them out explicitly.
 Future<List<EnishEvent>> fetchUpcomingEvents() async {
   final since = DateTime.now().toUtc().subtract(const Duration(hours: 6));
   final rows = await Supabase.instance.client
       .from('events')
       .select()
       .eq('status', 'published')
+      .eq('members_only', false)
       .gte('starts_at', since.toIso8601String())
       .order('starts_at');
   return [for (final r in rows) EnishEvent.fromJson(r)];
 }
 
-final upcomingEventsProvider =
-    FutureProvider<List<EnishEvent>>((ref) => fetchUpcomingEvents());
+/// Reloads whenever someone signs in or out, so nothing read with one
+/// account's access lingers on screen after it.
+final upcomingEventsProvider = FutureProvider<List<EnishEvent>>((ref) {
+  ref.watch(sessionProvider.select((s) => s.value?.user.id));
+  return fetchUpcomingEvents();
+});
 
 extension EventsAt on List<EnishEvent> {
   List<EnishEvent> at(String venueCode) =>

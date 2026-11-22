@@ -435,10 +435,12 @@ class _EventEditorScreenState extends ConsumerState<EventEditorScreen> {
 
   Future<void> _pickDate() async {
     final now = DateTime.now();
+    final earliest = DateTime(now.year - 1);
     final d = await showDatePicker(
       context: context,
       initialDate: _date ?? now,
-      firstDate: DateTime(now.year - 1),
+      // Old events stay editable: never start the range after their date.
+      firstDate: _date != null && _date!.isBefore(earliest) ? _date! : earliest,
       lastDate: DateTime(now.year + 2),
     );
     if (d != null) setState(() => _date = d);
@@ -845,8 +847,31 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
   }
 
   Future<void> _remove(Map<String, dynamic> row) async {
+    final email = row['email'] as String? ?? '';
+    final self = Supabase.instance.client.auth.currentUser?.email;
+    final isSelf = self != null && self.toLowerCase() == email.toLowerCase();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(isSelf ? 'Remove your own access?' : 'Remove access?'),
+        content: Text(isSelf
+            ? 'You will lose this access straight away and need another group '
+                'admin to give it back.'
+            : '$email will lose this access straight away.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('KEEP')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('REMOVE')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
     try {
       await StaffApi.revoke(row['id'] as String);
+      if (!mounted) return;
       ref.invalidate(_teamProvider);
       ref.invalidate(staffAccessProvider);
     } catch (e) {
