@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../brand/brand.dart';
@@ -415,9 +416,71 @@ class EnquiryScreen extends ConsumerStatefulWidget {
 
 class _EnquiryScreenState extends ConsumerState<EnquiryScreen> {
   final _form = GlobalKey<FormState>();
+  final _name = TextEditingController();
+  final _email = TextEditingController();
+  final _phone = TextEditingController();
+  final _eventType = TextEditingController();
+  final _preferredDate = TextEditingController();
+  final _guestCount = TextEditingController();
+  final _message = TextEditingController();
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _email.dispose();
+    _phone.dispose();
+    _eventType.dispose();
+    _preferredDate.dispose();
+    _guestCount.dispose();
+    _message.dispose();
+    super.dispose();
+  }
 
   String? _required(String? v) =>
       (v == null || v.trim().isEmpty) ? 'Required' : null;
+
+  Future<void> _submit() async {
+    if (!_form.currentState!.validate()) return;
+    setState(() => _busy = true);
+    try {
+      final res = await Supabase.instance.client.functions.invoke(
+        'submit-enquiry',
+        body: {
+          'venue_code': widget.code,
+          'name': _name.text.trim(),
+          'email': _email.text.trim(),
+          'phone': _phone.text.trim().isEmpty ? null : _phone.text.trim(),
+          'event_type': _eventType.text.trim(),
+          'preferred_date': _preferredDate.text.trim(),
+          'guest_count': _guestCount.text.trim().isEmpty
+              ? null
+              : int.tryParse(_guestCount.text.trim()),
+          'message': _message.text.trim().isEmpty ? null : _message.text.trim(),
+        },
+      );
+      if (!mounted) return;
+      if (res.status != 200) {
+        final err = (res.data is Map) ? (res.data as Map)['error'] : res.data;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not send: $err')),
+        );
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enquiry sent. The venue team will be in touch.')),
+      );
+      if (context.canPop()) context.pop();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not send enquiry: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -441,47 +504,54 @@ class _EnquiryScreenState extends ConsumerState<EnquiryScreen> {
               style: EnishText.body,
             ),
             TextFormField(
+              controller: _name,
               decoration: const InputDecoration(labelText: 'Name'),
               validator: _required,
+              textInputAction: TextInputAction.next,
             ),
             TextFormField(
+              controller: _email,
               decoration: const InputDecoration(labelText: 'Email'),
               keyboardType: TextInputType.emailAddress,
               validator: _required,
+              textInputAction: TextInputAction.next,
             ),
             TextFormField(
+              controller: _phone,
+              decoration: const InputDecoration(labelText: 'Phone (optional)'),
+              keyboardType: TextInputType.phone,
+              textInputAction: TextInputAction.next,
+            ),
+            TextFormField(
+              controller: _eventType,
               decoration: const InputDecoration(labelText: 'Type of event'),
               validator: _required,
+              textInputAction: TextInputAction.next,
             ),
             TextFormField(
+              controller: _preferredDate,
               decoration: const InputDecoration(labelText: 'Preferred date'),
               validator: _required,
+              textInputAction: TextInputAction.next,
             ),
             TextFormField(
+              controller: _guestCount,
               decoration: const InputDecoration(labelText: 'Number of guests'),
               keyboardType: TextInputType.number,
               validator: _required,
+              textInputAction: TextInputAction.next,
             ),
             TextFormField(
+              controller: _message,
               decoration: const InputDecoration(labelText: 'Anything else'),
               maxLines: 3,
+              textInputAction: TextInputAction.done,
             ),
             const SizedBox(height: EnishSpace.lg),
             EnishButton(
-              label: 'Send enquiry',
+              label: _busy ? 'Sending…' : 'Send enquiry',
               color: venue?.accent,
-              onPressed: () {
-                if (!_form.currentState!.validate()) return;
-                // TODO(backend): post to the enquiries endpoint, routed to the
-                // venue's events contact. Nothing is sent yet.
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Enquiry sending is not connected yet. Nothing was sent.',
-                    ),
-                  ),
-                );
-              },
+              onPressed: _busy ? null : _submit,
             ),
           ],
         ),
