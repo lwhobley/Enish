@@ -1,6 +1,7 @@
 import 'dart:ui' show Color;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 enum VenueStatus { open, comingSoon, unknown }
@@ -110,13 +111,32 @@ List<Venue> sortVenues(List<Venue> venues) {
 
 final venuesProvider = FutureProvider<List<Venue>>((ref) => fetchVenues());
 
-/// The guest's chosen "home" Enish. In memory for now; persist with the
-/// account once sign-in exists.
+/// The guest's chosen "home" Enish. Persisted locally; will sync to the
+/// account once guest sign-in exists.
 class HomeVenueNotifier extends Notifier<String?> {
-  @override
-  String? build() => null;
+  static const _key = 'home_venue_code';
 
-  void set(String? code) => state = code;
+  @override
+  String? build() {
+    _load();
+    return null;
+  }
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    final code = prefs.getString(_key);
+    if (code != state) state = code;
+  }
+
+  Future<void> set(String? code) async {
+    state = code;
+    final prefs = await SharedPreferences.getInstance();
+    if (code == null || code.isEmpty) {
+      await prefs.remove(_key);
+    } else {
+      await prefs.setString(_key, code);
+    }
+  }
 }
 
 final homeVenueProvider =

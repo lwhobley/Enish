@@ -22,8 +22,9 @@ abstract final class EnishSpace {
 }
 
 abstract final class EnishText {
-  // TODO(brand): the website uses "Gyst Variable" for headings and DM Sans for
-  // body. Bundle the licensed font files and set fontFamily here.
+  // TODO(brand): website uses proprietary "Gyst Variable" for headings and DM Sans
+  // for body. Bundle licensed font files under assets/fonts/ and set fontFamily,
+  // or use google_fonts for DM Sans as an interim (add the package and wrap the theme).
   static const display = TextStyle(
     fontSize: 28,
     fontWeight: FontWeight.w700,

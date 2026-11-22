@@ -16,7 +16,7 @@ Built with Flutter (iOS, Android, web) on a Supabase backend.
 | `lib/brand/` | Colours, type and shared visual components |
 | `supabase/migrations/` | Database schema, row-level security and storage rules |
 | `supabase/seed/venues.sql` | The venue registry |
-| `supabase/functions/` | Edge Functions (the two importers are one-offs, now disabled) |
+| `supabase/functions/` | Edge Functions: `submit-enquiry`, plus two one-off importers (now disabled) |
 | `test/widget_test.dart` | Unit and widget tests |
 | `codemagic.yaml` | iOS build and TestFlight upload |
 
@@ -74,6 +74,14 @@ keeps that (`starts_local`, `ends_local`) and works out the real instant
 (`starts_at`, `ends_at`) from the venue's time zone, so listings sort
 correctly across London, Dubai, Houston and Africa.
 
+### Enquiries and saved preferences
+
+- Event enquiries from a venue page go to the `submit-enquiry` Edge Function,
+  which saves them to the `enquiries` table with the service role. Venue staff
+  can read their venue's enquiries.
+- A guest's chosen home venue is saved on the device (shared_preferences)
+  until guest accounts exist.
+
 ## Releasing
 
 Every push to `main` makes Codemagic run the tests, build the iOS app and
@@ -81,6 +89,6 @@ upload it to TestFlight (see `codemagic.yaml`).
 
 ## Not built yet
 
-- Sending event enquiries: the form exists, but nothing is sent until a
-  `submit-enquiry` Edge Function is written.
 - Insider membership and billing.
+- Guest accounts and booking history.
+- Ongoing media import from the website or Instagram.
